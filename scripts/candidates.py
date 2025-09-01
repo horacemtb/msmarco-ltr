@@ -4,6 +4,9 @@ from tqdm import tqdm
 
 
 def _chunks(seq: List[str], size: int) -> Iterable[List[str]]:
+    """
+    Split list into chunks of given size for convenient batch search
+    """
     for i in range(0, len(seq), size):
         yield seq[i:i+size]
 
@@ -14,7 +17,19 @@ def retrieve_topk(searcher,
                   threads: int = 8,
                   batch_size: int = 1000,
                   desc: str = "Retrieving") -> Dict[str, List[Tuple[str, float]]]:
-    """Returns: runs[qid] = [(docid, score), ...] length <= k."""
+    """
+    Retrieve top-k documents for each query using searcher.
+
+    Args:
+        searcher: bm25, impact, etc.
+        qid_to_query: query id to text mapping
+        k: number of documents to retrieve per query
+        threads: number of threads for batch search
+        batch_size: batch size for batch extraction
+        desc: prog bar description
+
+    Returns:
+        runs[qid] = [(docid, score), ...] length <= k."""
     qids = [q for q in qid_to_query.keys()]
     texts = [qid_to_query[q] for q in qids]
     runs: Dict[str, List[Tuple[str, float]]] = {}
@@ -42,10 +57,19 @@ def retrieve_topk(searcher,
 
 def rrf_fuse_runs(
     runs_list: List[Dict[str, List[Tuple[str, float]]]],
-    K: int = 100,  # how many to keep per query
-    k: int = 60,   # RRF constant; according to Microsoft, "experimentally observed to perform best if it's set to a small value like 60".
-) -> Dict[str, List[Tuple[str, float]]]:
+    K: int = 100,
+    k: int = 60) -> Dict[str, List[Tuple[str, float]]]:
+    """
+    Fuse runs from multiple searchers using Reciprocal Rank Fusion approach
 
+    Args:
+        runs_list: list of runs, where each run is a dictionary containing results by a searcher
+        K: number of documents to keep per query
+        k: RRF constant (according to Microsoft, "experimentally observed to perform best if it's set to a small value like 60")
+        
+    Returns:
+        Fused runs with RRF scores
+    """
     fused: Dict[str, List[Tuple[str, float]]] = {}
     all_qids = set().union(*[r.keys() for r in runs_list])
     for qid in all_qids:
@@ -106,7 +130,9 @@ def print_metrics_at_k(
     qrels: Dict[str, Set[str]],
     K: int,
     model: str):
-
+    """
+    Print hit rate and recall at K for given runs and qrels
+    """
     model_metrics = hit_rate_recall_at_k(runs, qrels, K)
     hit_rate, recall = model_metrics[0], model_metrics[1]
     print(f"{model} hit rate at k={K}: {hit_rate}, {model} recall at k={K}: {recall}")
